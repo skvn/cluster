@@ -32,11 +32,11 @@ class ApiService extends BaseService
         }
 
         $file = $this->app->getPath('@root/' . $data['file']);
-        if (file_exists(dirname($file))) {
+        if (!file_exists(dirname($file))) {
             mkdir(dirname($file), 0777, true);
         }
         $host = $this->app->cluster->getHostById($data['host_id']);
-        $url = $this->app->cluster->getFileUrl($data['file'], $host);
+        $url = $this->app->cluster->getFileUrl($data['file'], $host['img']);
         $fp = fopen($file, 'w');
         try {
             $this->app->urlLoader->load($url, [], ['returntransfer' => false, 'file' => $fp]);

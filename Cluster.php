@@ -21,9 +21,9 @@ class Cluster
     {
         $this->config = $config;
         $siblings  = !empty($this->config['siblings']) ? explode(',', $this->config['siblings']) : [];
-        foreach ($siblings as $host_id => $host) {
+        foreach ($siblings as $host_id) {
             if (isset($this->config['hosts'][$host_id])) {
-                $this->hosts[$host_id] = $host;
+                $this->hosts[$host_id] = $this->config['hosts'][$host_id];
             }
         }
     }
@@ -68,7 +68,7 @@ class Cluster
         $this->queueFile($file, static :: FILE_PUSH);
         foreach ($this->hosts as $host_id => $host) {
             $this->log('CALL PUSH', $file, ['host' => $host['ctl']]);
-            $this->app->api->call($host['ctl'], 'dfs/fetch', ['file' => $file]);
+            $this->app->api->call($host['ctl'], 'dfs/fetch', ['file' => $file, 'host_id' => $this->config['my_id']]);
         }
     }
 
@@ -78,7 +78,7 @@ class Cluster
         $this->queueFile($file, static :: FILE_DELETE);
         foreach ($this->hosts as $host_id => $host) {
             $this->log('CALL DELETE', $file, ['host' => $host['ctl']]);
-            $this->app->api->call($host['ctl'], 'dfs/delete', ['file' => $file]);
+            $this->app->api->call($host['ctl'], 'dfs/delete', ['file' => $file, 'host_id' => $this->config['my_id']]);
         }
     }
 
@@ -108,7 +108,7 @@ class Cluster
     private function queueFile($file, $action)
     {
         $hash = $action == static :: FILE_DELETE ? '' : md5_file($file);
-        $this->db->insert($this->config['queue_table'], [
+        $this->app->db->insert($this->config['queue_table'], [
             'filename' => $file,
             'action' => $action,
             'checksum' => $hash,
