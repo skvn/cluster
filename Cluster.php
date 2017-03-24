@@ -59,6 +59,7 @@ class Cluster
             $this->log('QUEUE DELETE', $file);
             $this->app->triggerEvent(new Events\DeleteFile(['file' => $file]));
         }
+        unlink($this->app->getPath('@root/' . $file));
     }
 
 
