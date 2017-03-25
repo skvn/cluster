@@ -89,7 +89,7 @@ class Cluster
 
     function getFile($file)
     {
-        $file = $this->normalizeFile($file);
+        $file = $this->normalizeFilename($file);
         if (file_exists($this->app->getPath('@root/' . $file))) {
             return $file;
         }
@@ -100,38 +100,11 @@ class Cluster
         return false;
     }
 
-    function get($f)
+    function callHost($host, $method, $args = [])
     {
-
-        if (!empty($this->config['is_slave']))
-        {
-            $result  = mtoSoapService :: callService($this->config['master_wsdl'], "getFile", array(
-                'login' => $this->config['login'],
-                'password' => $this->config['password'],
-                'filename' => $this->_fn($f)
-            ));
-            if (!isset($result['content']))
-            {
-                $this->log("NOT FOUND: " . $f);
-                return false;
-            }
-            $filename = $this->root . '/' . $this->_fn($f);
-            if (file_exists($filename))
-            {
-                unlink($filename);
-            }
-            mtoFs :: mkdir(dirname($filename));
-            file_put_contents($filename, base64_decode($result['content']));
-            $this->log("GET: " . $f);
-            return $f;
-        }
-        else
-        {
-            $this->log("NOT FOUND: " . $f);
-            return false;
-        }
+        $args['host_id'] = $this->config['my_id'];
+        return $this->app->api->call($host['ctl'], 'dfs/' . $method, $args);
     }
-
 
     function pushFileSync($file)
     {
@@ -139,7 +112,7 @@ class Cluster
         $this->queueFile($file, static :: FILE_PUSH);
         foreach ($this->hosts as $host_id => $host) {
             $this->log('CALL PUSH', $file, ['host' => $host['ctl']]);
-            $this->app->api->call($host['ctl'], 'dfs/fetch', ['file' => $file, 'host_id' => $this->config['my_id']]);
+            $this->callHost($host, 'fetch', ['file' => $file]);
         }
     }
 
@@ -149,14 +122,17 @@ class Cluster
         $this->queueFile($file, static :: FILE_DELETE);
         foreach ($this->hosts as $host_id => $host) {
             $this->log('CALL DELETE', $file, ['host' => $host['ctl']]);
-            $this->app->api->call($host['ctl'], 'dfs/delete', ['file' => $file, 'host_id' => $this->config['my_id']]);
+            $this->callHost($host, 'delete', ['file' => $file]);
         }
     }
 
-    function getHostById($host_id)
+    function getHostById($host_id, $fullInfo = false)
     {
         if (!isset($this->config['hosts'][$host_id])) {
             throw new Exceptions\ClusterException('Host ' . $host_id . ' does not exist');
+        }
+        if ($fullInfo) {
+            $this->loadHostInfo($host_id);
         }
         return $this->config['hosts'][$host_id];
     }
@@ -184,6 +160,25 @@ class Cluster
         throw new Exceptions\ClusterException('File ' . $file . ' is not available for http access');
     }
 
+    function fetchQueue()
+    {
+        $host = $this->getMasterHost();
+        if ($host === false) {
+            return;
+        }
+        $queue = $this->callHost($host, 'queue');
+        $this->log('QUEUE RECEIVED', count($queue) . ' events');
+        return $queue;
+    }
+
+    function getQueueForHost($host_id)
+    {
+        $host = $this->getHostById($host_id, true);
+        $queue = $this->app->db->select('select * from ' . $this->config['queue_table'] . ' where id > ? order by id limit 500', [$host['last_event']]);
+        $this->log('QUEUE FETCH', $host_id, ['count' => count($queue)]);
+        return $queue;
+    }
+
     private function queueFile($file, $action)
     {
         $hash = $action == static :: FILE_DELETE ? '' : md5_file($file);
@@ -194,6 +189,33 @@ class Cluster
             'host_id' => $this->config['my_id'],
             'event_time' => time()
         ]);
+    }
+
+    private function loadHostInfo($host_id)
+    {
+        if (!isset($this->config['hosts'][$host_id])) {
+            throw new Exceptions\ClusterException('Host ' . $host_id . ' does not exist');
+        }
+        if (!empty($this->config['hosts'][$host_id]['id'])) {
+            return;
+        }
+        $row = $this->app->db->selectOne('select * from ' . $this->config['client_table'] . ' where id=?', [$host_id]);
+        if (empty($row)) {
+            $row = [
+                'id' => $host_id,
+                'last_event' => null,
+                'last_sync' => 0,
+                'last_event_time' => null,
+                'last_pinged' => 0
+            ];
+            $this->app->db->insert($this->config['client_table'], $row);
+        }
+        foreach ($row as $k => $v) {
+            $this->config['hosts'][$host_id][$k] = $v;
+            if (isset($this->hosts[$host_id])) {
+                $this->hosts[$host_id][$k] = $v;
+            }
+        }
     }
 
     private function normalizeFilename($filename)
@@ -221,9 +243,35 @@ class Cluster
         }
     }
 
+    function updateClient($data)
+    {
+        return $this->app->db->update($this->config['client_table'], $data);
+    }
+
+//    function deleteFileSync($file)
+//    {
+//        $file = $this->normalizeFilename($file);
+//        $this->queueFile($file, static :: FILE_DELETE);
+//        foreach ($this->hosts as $host_id => $host) {
+//            $this->log('CALL DELETE', $file, ['host' => $host['ctl']]);
+//            $this->app->api->call($host['ctl'], 'dfs/delete', ['file' => $file, 'host_id' => $this->config['my_id']]);
+//        }
+//    }
+
+
     function init()
     {
         $sql = [];
+        $sql[] = "drop table if exists `".$this->config['client_table']."`";
+        $sql[] = "CREATE TABLE `".$this->config['client_table']."` (
+              `id` int(11) NOT NULL,
+              `last_event` int(11) DEFAULT NULL,
+              `last_sync` int(11) DEFAULT '0',
+              `last_event_time` int(11) DEFAULT NULL,
+              `last_pinged` int(11) DEFAULT '0',
+              PRIMARY KEY (`id`)
+            ) engine=innodb
+        ";
         $sql[] = "CREATE TABLE `".$this->config['queue_table']."` (
              `id` int(11) NOT NULL AUTO_INCREMENT,
              `host_id` int(11) default 0,

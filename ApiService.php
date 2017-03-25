@@ -46,4 +46,18 @@ class ApiService extends BaseService
         }
     }
 
+    function queue($data)
+    {
+        $queue = $this->app->cluster->getQueueForHost($data['host_id']);
+        return $queue;
+    }
+
+    function update_client($data)
+    {
+        $data['id'] = $data['host_id'];
+        unset($data['host_id']);
+        unset($data['endpoint']);
+        return $this->app->cluster->updateClient($data);
+    }
+
 }
