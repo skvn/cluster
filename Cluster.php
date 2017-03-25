@@ -65,6 +65,73 @@ class Cluster
 
     }
 
+    function fetchFileFromHost($file, $host)
+    {
+        $filename = $this->app->getPath('@root/' . $file);
+        if (!file_exists(dirname($filename))) {
+            mkdir(dirname($filename), 0777, true);
+        }
+        $url = $this->getFileUrl($file, $host['img']);
+        $fp = fopen($filename, 'w');
+        try {
+            $this->app->urlLoader->load($url, [], ['returntransfer' => false, 'file' => $fp]);
+            $this->log('FETCHED', $file);
+            $result = true;
+        }
+        catch (\Exception $e) {
+            $this->log('FETCH FAILED', $file, ['error' => $e->getMessage()]);
+            unlink($filename);
+            $result = false;
+        }
+        fclose($fp);
+        return $result;
+    }
+
+    function getFile($file)
+    {
+        $file = $this->normalizeFile($file);
+        if (file_exists($this->app->getPath('@root/' . $file))) {
+            return $file;
+        }
+        $host = $this->getMasterHost();
+        if ($host) {
+            return $this->fetchFileFromHost($file, $host);
+        }
+        return false;
+    }
+
+    function get($f)
+    {
+
+        if (!empty($this->config['is_slave']))
+        {
+            $result  = mtoSoapService :: callService($this->config['master_wsdl'], "getFile", array(
+                'login' => $this->config['login'],
+                'password' => $this->config['password'],
+                'filename' => $this->_fn($f)
+            ));
+            if (!isset($result['content']))
+            {
+                $this->log("NOT FOUND: " . $f);
+                return false;
+            }
+            $filename = $this->root . '/' . $this->_fn($f);
+            if (file_exists($filename))
+            {
+                unlink($filename);
+            }
+            mtoFs :: mkdir(dirname($filename));
+            file_put_contents($filename, base64_decode($result['content']));
+            $this->log("GET: " . $f);
+            return $f;
+        }
+        else
+        {
+            $this->log("NOT FOUND: " . $f);
+            return false;
+        }
+    }
+
 
     function pushFileSync($file)
     {
@@ -92,6 +159,14 @@ class Cluster
             throw new Exceptions\ClusterException('Host ' . $host_id . ' does not exist');
         }
         return $this->config['hosts'][$host_id];
+    }
+
+    function getMasterHost()
+    {
+        if (!empty($this->config['master_host'])) {
+            return $this->getHostById($this->config['master_host']);
+        }
+        return false;
     }
 
     function getFileUrl($file, $host = null)

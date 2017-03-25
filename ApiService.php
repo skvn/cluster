@@ -30,23 +30,8 @@ class ApiService extends BaseService
         if (empty($data['file'])) {
             throw new Exceptions\ClusterException('No filename to push');
         }
-
-        $file = $this->app->getPath('@root/' . $data['file']);
-        if (!file_exists(dirname($file))) {
-            mkdir(dirname($file), 0777, true);
-        }
         $host = $this->app->cluster->getHostById($data['host_id']);
-        $url = $this->app->cluster->getFileUrl($data['file'], $host['img']);
-        $fp = fopen($file, 'w');
-        try {
-            $this->app->urlLoader->load($url, [], ['returntransfer' => false, 'file' => $fp]);
-            $this->app->cluster->log('SAVED', $data['file']);
-        }
-        catch (\Exception $e) {
-            $this->app->cluster->log('SAVE FAILED', $data['file'], ['error' => $e->getMessage()]);
-            unlink($file);
-        }
-        fclose($fp);
+        return $this->app->cluster->fetchFileFromHost($data['file'], $host);
     }
 
     function delete($data)
