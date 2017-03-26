@@ -60,4 +60,9 @@ class ApiService extends BaseService
         return $this->app->cluster->updateClient($data);
     }
 
+    function ping($data)
+    {
+        return true;
+    }
+
 }

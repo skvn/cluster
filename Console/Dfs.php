@@ -68,7 +68,19 @@ class Dfs extends ConsoleActionEvent
                 'host_id' => $this->app->cluster->getOption('my_id')
             ]));
         }
+    }
 
+    function actionPing()
+    {
+        $down = $this->app->cluster->pingNodes();
+        if (count($down) > 0) {
+            foreach ($down as $host_id) {
+                $this->app->triggerEvent(new \Skvn\Event\Events\NotifyProblem([
+                    'problem' => 'cluster_host_down',
+                    'host_id' => $host_id
+                ]));
+            }
+        }
     }
 
 

@@ -287,6 +287,39 @@ class Cluster
         return true;
     }
 
+    function pingNodes()
+    {
+        $down = [];
+        foreach ($this->hosts as $host_id => $host) {
+            $result = $this->callHost($host, 'ping');
+            if ($result === true) {
+                $this->updateClient(['id' => $host_id, 'last_pinged' => time()]);
+            }
+        }
+        $failed = $this->app->db->select("select * from ". $this->config['client_table']." where last_pinged < ?", [time() - $this->config['ping_threshold'] * 60]);
+        if ($failed) {
+            $marker = $this->app->getPath($this->config['down_host_marker']);
+            if (file_exists($marker)) {
+                $list = parse_ini_file($marker);
+            } else {
+                $list = [];
+            }
+            foreach ($failed as $host) {
+                if (!in_array($host['id'], $list)) {
+                    $list[$host['id']] = 1;
+                    $down[] = $host['id'];
+                }
+            }
+            $strings = [];
+            foreach ($list as $k => $v) {
+                $strings[] = $k . ' = ' . $v;
+            }
+            file_put_contents($marker, implode(PHP_EOL, $strings));
+
+        }
+        return $down;
+    }
+
 
     function init()
     {
