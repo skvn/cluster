@@ -33,6 +33,16 @@ class Cluster
         return $this->config;
     }
 
+    function getOption($name)
+    {
+        return $this->config[$name] ?? null;
+    }
+
+    function getAllHosts()
+    {
+        return $this->config['hosts'];
+    }
+
     function pushFile($file)
     {
         $file = $this->normalizeFilename($file);
@@ -257,6 +267,25 @@ class Cluster
 //            $this->app->api->call($host['ctl'], 'dfs/delete', ['file' => $file, 'host_id' => $this->config['my_id']]);
 //        }
 //    }
+
+    function heartbeat()
+    {
+        $this->app->db->statement('update ' . $this->config['heartbeat_table'] . ' set ' . $this->config['heartbeat_field'] . '=' . time());
+    }
+
+    function checkHeartbeat()
+    {
+        $slave = $this->app->db->selectOne("show slave status");
+        $hb = $this->app->db->selectOne("select * from " . $this->config['heartbeat_table']);
+        $io = $slave['Slave_IO_Running'] ?? 'No';
+        $sql = $slave['Slave_SQL_Running'] ?? 'No';
+        $hbts = $hb[$this->config['heartbeat_field']] ?? 0;
+        if ($io != "Yes" || $sql != "Yes" || (time()-$hbts) > ($this->config['heartbeat_warning'] * 60))
+        {
+            return false;
+        }
+        return true;
+    }
 
 
     function init()

@@ -51,5 +51,25 @@ class Dfs extends ConsoleActionEvent
         $this->app->cluster->log('UPDATED', count($queue) . ' executed');
     }
 
+    /**
+     * Update heartbeat marker
+     */
+    function actionHeartbeat()
+    {
+        $this->app->cluster->heartbeat();
+    }
+
+    function actionCheckHeartbeat()
+    {
+        if (!$this->app->cluster->checkHeartbeat()) {
+            $this->stdout('Replication broken');
+            $this->app->triggerEvent(new \Skvn\Event\Events\NotifyProblem([
+                'problem' => 'cluster_heartbeat',
+                'host_id' => $this->app->cluster->getOption('my_id')
+            ]));
+        }
+
+    }
+
 
 }
