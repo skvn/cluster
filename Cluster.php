@@ -305,7 +305,7 @@ class Cluster
                 $list = [];
             }
             foreach ($failed as $host) {
-                if (!in_array($host['id'], $list)) {
+                if (!array_key_exists($host['id'], $list)) {
                     $list[$host['id']] = 1;
                     $down[] = $host['id'];
                 }
