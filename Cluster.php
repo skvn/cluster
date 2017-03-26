@@ -258,15 +258,26 @@ class Cluster
         return $this->app->db->update($this->config['client_table'], $data);
     }
 
-//    function deleteFileSync($file)
-//    {
-//        $file = $this->normalizeFilename($file);
-//        $this->queueFile($file, static :: FILE_DELETE);
-//        foreach ($this->hosts as $host_id => $host) {
-//            $this->log('CALL DELETE', $file, ['host' => $host['ctl']]);
-//            $this->app->api->call($host['ctl'], 'dfs/delete', ['file' => $file, 'host_id' => $this->config['my_id']]);
-//        }
-//    }
+    function isSectionLocked($section = null, $skey = null)
+    {
+        if (is_null($section)) {
+            $section = $this->getSection($skey);
+        }
+        return in_array($section, $this->config['locked_sections']);
+    }
+
+    function getSection($skey)
+    {
+        foreach ($this->config['shards'] as $k => $section) {
+            if ($skey >= $section[0] && $skey <= $section[1]) {
+                return $k;
+            }
+        }
+        throw new Exceptions\ClusterException('Section not found for key ' . $skey);
+    }
+
+
+
 
     function heartbeat()
     {
