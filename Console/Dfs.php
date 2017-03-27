@@ -47,7 +47,11 @@ class Dfs extends ConsoleActionEvent
             }
             $last_id = $file['id'];
         }
-        $this->app->cluster->callHost($master, 'update_client', ['last_event' => $last_id, 'last_event_time' => time()]);
+        $params = ['last_event_time' => time()];
+        if ($last_id > 0) {
+            $params['last_event'] = $last_id;
+        }
+        $this->app->cluster->callHost($master, 'update_client', $params);
         $this->app->cluster->log('UPDATED', count($queue) . ' executed');
     }
 
