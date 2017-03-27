@@ -13,6 +13,7 @@ class Cluster
 
     protected $config;
     protected $hosts = [];
+    protected $downNodes = null;
 
     const FILE_PUSH = 2;
     const FILE_DELETE = 3;
@@ -275,6 +276,43 @@ class Cluster
         }
         throw new Exceptions\ClusterException('Section not found for key ' . $skey);
     }
+
+    function getHost($section = null, $skey = null, $args = [], $param = 'img')
+    {
+        if (is_null($section)) {
+            $section = $this->getSection($skey);
+        }
+        $hosts = explode(',', $this->config['shard_distr'][$section] ?? '');
+        if (empty($hosts)) {
+            throw new Exceptions\ClusterException('Hosts not found for section ' . $section);
+        }
+        shuffle($hosts);
+        $host_id = $hosts[0];
+        if (!empty($args['ts']) && $args['ts'] > (time() - $this->config['ping_threshold']*60)) {
+            $host_id = $this->config['my_id'];
+        }
+        if ($this->isHostDown($host_id)) {
+            $host = $this->getMasterHost();
+        } else {
+            $host = $this->getHostById($host_id);
+        }
+        return !empty($param) ? $host[$param] : $host;
+
+    }
+
+    function isHostDown($host_id)
+    {
+        if (is_null($this->downNodes)) {
+            $marker = $this->app->getPath($this->config['down_host_marker']);
+            if (file_exists($marker)) {
+                $this->downNodes = array_keys(parse_ini_file($marker));
+            } else {
+                $this->downNodes = [];
+            }
+        }
+        return in_array($host_id, $this->downNodes);
+    }
+
 
 
 
