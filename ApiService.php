@@ -60,6 +60,13 @@ class ApiService extends BaseService
         return $this->app->cluster->updateClient($data);
     }
 
+    function triggerEvent($data)
+    {
+        $class = $data['event'];
+        unset($data['event']);
+        $this->app->triggerEvent(new $class($data));
+    }
+
     function ping($data)
     {
         return true;

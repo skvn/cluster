@@ -5,6 +5,7 @@ namespace Skvn\Cluster;
 use Skvn\Base\Traits\AppHolder;
 use Skvn\Base\Helpers\Str;
 use Skvn\Event\Events\Log as LogEvent;
+use Skvn\Event\Event as BaseEvent;
 
 
 class Cluster
@@ -314,7 +315,15 @@ class Cluster
     }
 
 
-
+    function triggerEvent(BaseEvent $event)
+    {
+        $this->app->triggerEvent($event);
+        $args = $event->payload();
+        $args['event'] = get_class($event);
+        foreach ($this->hosts as $host) {
+            $this->callHost($host, 'triggerEvent', $args);
+        }
+    }
 
 
     function heartbeat()
