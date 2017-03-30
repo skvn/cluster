@@ -102,7 +102,7 @@ class Dfs extends ConsoleActionEvent
     function actionSyncSection()
     {
         $this->app->db->disconnect();
-        $command = $this->app->cluster->getOption('rsync_command');
+        $command = $this->app->cluster->getOption('rsync_command') . ' ';
         $command .= $this->app->getPath($this->app->cluster->getOption("sections_path")) . "/" . $this->options['section'] . "/ ";
         $host = $this->app->cluster->getHostById($this->options['target']);
         $command .= $host['img'] . "::section" . $this->options['section'];
