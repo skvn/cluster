@@ -95,22 +95,42 @@ class Dfs extends ConsoleActionEvent
 
 
     /**
-     * Sync by rsync files in one section
-     * @option number *section Number of section to sync
-     * @option number *target Target host to sync
+     * Scheduled rsync data sync
      */
-    function actionSyncSection()
+    function actionSync()
+    {
+        $schedule = $this->app->cluster->getOption('sync_schedule');
+        $action = $schedule[date('H:i')] ?? null;
+        if (empty($action)) {
+            return;
+        }
+        if ($action['source'] !== $this->app->cluster->getOption('my_id')) {
+            return;
+        }
+        $result = [];
+        if (!empty($action['section'])) {
+            $result = $this->syncSection($action['section'], $action['target']);
+        }
+        if (!empty($result)) {
+            $subject = 'DSF SYNC: ' . json_encode($action);
+            $this->app->triggerEvent(new \Skvn\Event\Events\NotifyRegular(['subject' => $subject, 'message' => implode(PHP_EOL, $result)]));
+        }
+    }
+
+
+    private function syncSection($section, $target)
     {
         $this->app->db->disconnect();
         $command = $this->app->cluster->getOption('rsync_command') . ' ';
-        $command .= $this->app->getPath($this->app->cluster->getOption("sections_path")) . "/" . $this->options['section'] . "/ ";
-        $host = $this->app->cluster->getHostById($this->options['target']);
-        $command .= $host['img'] . "::section" . $this->options['section'];
+        $command .= $this->app->getPath($this->app->cluster->getOption("sections_path")) . "/" . $section . "/ ";
+        $host = $this->app->cluster->getHostById($target);
+        $command .= $host['img'] . "::section" . $section;
         exec($command, $result);
-        $this->stdout("Section " . $this->options['section'] . " copied to node " . $this->options['target']);
-        $this->stdout("Result: ");
-        $this->stdout($result);
-
+        $strings = [];
+        $strings[] = "Section " . $section . " copied to node " . $target;
+        $strings[] = "Result: ";
+        $strings = array_merge($strings, $result);
+        return $strings;
     }
 
 
