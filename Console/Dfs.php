@@ -114,7 +114,7 @@ class Dfs extends ConsoleActionEvent
         if (!empty($action['section'])) {
             $this->app->triggerEvent(new Log(['message' => "Syncing", 'category' => 'dfs_sync', 'info' => $action]));
             $t = microtime(true);
-            $result = $this->syncSection($action['section'], $action['target']);
+            $result = $this->syncSection($action['section'], $action['target'], $action);
             if (!empty($result)) {
                 $this->app->triggerEvent(new Log([
                     'message' => "Synced",
@@ -135,23 +135,33 @@ class Dfs extends ConsoleActionEvent
     }
 
 
-    private function syncSection($section, $target)
+    private function syncSection($section, $target, $args = [])
     {
         $t = microtime(true);
         $this->app->db->disconnect();
-        $command = $this->app->cluster->getOption('rsync_command') . ' ';
-        $command .= $this->app->getPath($this->app->cluster->getOption("sections_path")) . "/" . $section . "/ ";
         $host = $this->app->cluster->getHostById($target);
-        $command .= $host['img'] . "::section" . $section;
+        $command = $this->app->cluster->getOption('rsync_command') . ' ';
+        if ($section === 'all') {
+            foreach ($args['exclude'] ?? [] as $ex) {
+                $command .= ' --exclude=/' . $ex . ' ';
+            }
+            $command .= $this->app->getPath($this->app->cluster->getOption("sections_path")) . "/ ";
+            $command .= $host['img'] . "::data";
+        } else {
+            $command .= $this->app->getPath($this->app->cluster->getOption("sections_path")) . "/" . $section . "/ ";
+            $command .= $host['img'] . "::section" . $section;
+        }
         exec($command, $result);
         $strings = [];
         $strings[] = "Section " . $section . " copied to node " . $target;
+        if (!empty($args['exclude'])) {
+            $strings[] = 'Excluded sections: ' . implode(', ', $args['exclude']);
+        }
         $strings[] = "Result: ";
         $strings = array_merge($strings, $result);
         $strings[] = '';
         $strings[] = 'Process done in ' . round(microtime(true)-$t, 1) . ' seconds';
         return $strings;
     }
-
 
 }
