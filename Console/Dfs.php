@@ -183,7 +183,7 @@ class Dfs extends ConsoleActionEvent
     {
         $command = $this->app->cluster->getOption('rsync_command') . '  -a -h -L -k -K --delete --stats --partial ';
         $command .= $this->app->getPath($this->app->cluster->getOption("sections_path")) . "/" . $section . "/ ";
-        $command .= $targetHost['img'] . "::section" . $section . '2>&1';
+        $command .= $targetHost['img'] . "::section" . $section . ' 2>&1';
         return $command;
     }
 
