@@ -114,7 +114,8 @@ class Dfs extends ConsoleActionEvent
         if (!empty($action['section'])) {
             $this->app->triggerEvent(new Log(['message' => "Syncing", 'category' => 'dfs_sync', 'info' => $action]));
             $t = microtime(true);
-            $result = $this->syncSection($action['section'], $action['target'], $action);
+            $result = $this->processSync($action);
+            //$result = $this->syncSection($action['section'], $action['target'], $action);
             if (!empty($result)) {
                 $this->app->triggerEvent(new Log([
                     'message' => "Synced",
@@ -134,34 +135,87 @@ class Dfs extends ConsoleActionEvent
         $this->app->triggerEvent(new \Skvn\Event\Events\Log(['message' => "No section", 'category' => 'dfs_sync']));
     }
 
-
-    private function syncSection($section, $target, $args = [])
+    private function processSync($args)
     {
+        if (empty($args['target'])) {
+            throw new ClusterException('Target not defined');
+        }
         $t = microtime(true);
         $this->app->db->disconnect();
-        $host = $this->app->cluster->getHostById($target);
-        $command = $this->app->cluster->getOption('rsync_command') . ' ';
-        if ($section === 'all') {
-            foreach ($args['exclude'] ?? [] as $ex) {
-                $command .= ' --exclude=/' . $ex . ' ';
-            }
-            $command .= $this->app->getPath($this->app->cluster->getOption("sections_path")) . "/ ";
-            $command .= $host['img'] . "::data";
-        } else {
-            $command .= $this->app->getPath($this->app->cluster->getOption("sections_path")) . "/" . $section . "/ ";
-            $command .= $host['img'] . "::section" . $section;
-        }
-        exec($command, $result);
+        $host = $this->app->cluster->getHostById($args['target']);
         $strings = [];
-        $strings[] = "Section " . $section . " copied to node " . $target;
-        if (!empty($args['exclude'])) {
-            $strings[] = 'Excluded sections: ' . implode(', ', $args['exclude']);
+        if (!empty($args['section'])) {
+            $command = $this->createSyncSectionCommand($host, $args['section']);
+            $strings[] = 'Section ' . $args['section'] . ' copied to node ' . $args['target'];
+        } elseif (!empty($args['data'])) {
+            $command = $this->createSyncDataCommand($host, $args['exclude'] ?? []);
+            $strings[] = 'Full dataset copied to node ' . $args['target'];
+            $strings[] = 'Sections ' . implode(', ', $args['exclude']) . 'excluded';
+        } elseif (!empty($args['shared'])) {
+            $command = $this->createSyncSharedCommand($host);
+            $strings[] = 'Shared data copied to node ' . $args['target'];
+        } elseif (!empty($args['common'])) {
+            foreach ($this->app->cluster->getOption('sync') as $part => $path) {
+                $strings[] = 'Common part ' . $part . ' copied to node ' . $args['target'];
+                $command = $this->createSyncCommonCommand($host, $path, $part);
+                $result = [];
+                exec($command, $result);
+                $strings[] = 'Result: ';
+                $strings = array_merge($strings, $result);
+                $strings[] = '';
+            }
+            $command = null;
+        } else {
+            throw new ClusterException('Nothing to sync');
         }
-        $strings[] = "Result: ";
-        $strings = array_merge($strings, $result);
-        $strings[] = '';
+
+        if (!empty($command)) {
+            exec($command, $result);
+            $strings[] = 'Result: ';
+            $strings = array_merge($strings, $result);
+            $strings[] = '';
+        }
         $strings[] = 'Process done in ' . round(microtime(true)-$t, 1) . ' seconds';
         return $strings;
     }
+
+    private function createSyncSectionCommand($targetHost, $section)
+    {
+        $command = $this->app->cluster->getOption('rsync_command') . '  -a -h -L -k -K --delete --stats --partial ';
+        $command .= $this->app->getPath($this->app->cluster->getOption("sections_path")) . "/" . $section . "/ ";
+        $command .= $targetHost['img'] . "::section" . $section . '2>&1';
+        return $command;
+    }
+
+    private function createSyncDataCommand($targetHost, $exclude)
+    {
+        $command = $this->app->cluster->getOption('rsync_command') . '  -a -h -L -k -K --delete --stats --partial ';
+        foreach ($exclude ?? [] as $ex) {
+            $command .= ' --exclude=/' . $ex . ' ';
+        }
+        $command .= $this->app->getPath($this->app->cluster->getOption("sections_path")) . "/ ";
+        $command .= $targetHost['img'] . "::data 2>&1";
+        return $command;
+    }
+
+    private function createSyncSharedCommand($targetHost)
+    {
+        $command = $this->app->cluster->getOption('rsync_command') . '  -a -h -L --stats --partial ';
+        $command .= \App :: getPath($this->app->cluster->getOption('shared_path')) . ' ';
+        $command .= $targetHost['img'] . "::shared  2>&1";
+        return $command;
+    }
+
+    private function createSyncCommonCommand($targetHost, $path, $name)
+    {
+        $command = $this->app->cluster->getOption('rsync_command') . '  -a -h -L -k -K --delete --stats --partial ';
+        $command .= $path . "/ ";
+        $command .= $targetHost['img'] . "::common_" . $name . ' 2>&1';
+        return $command;
+    }
+
+
+
+
 
 }
