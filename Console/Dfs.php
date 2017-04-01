@@ -6,6 +6,7 @@ use Skvn\App\Events\ConsoleActionEvent;
 use Skvn\Base\Traits\SelfDescribe;
 use Skvn\Cluster\Cluster;
 use Skvn\Cluster\Exceptions\ClusterException;
+use Skvn\Event\Events\Log;
 
 /**
  * Dfs operations
@@ -99,27 +100,44 @@ class Dfs extends ConsoleActionEvent
      */
     function actionSync()
     {
+        $startTime = time();
         $schedule = $this->app->cluster->getOption('sync_schedule');
         $action = $schedule[date('H:i')] ?? null;
         if (empty($action)) {
+            $this->app->triggerEvent(new Log(['message' => "No time", 'category' => 'dfs_sync']));
             return;
         }
-        if ($action['source'] !== $this->app->cluster->getOption('my_id')) {
+        if ($action['source'] !== intval($this->app->cluster->getOption('my_id'))) {
+            $this->app->triggerEvent(new Log(['message' => "Foreign source", 'category' => 'dfs_sync']));
             return;
         }
-        $result = [];
         if (!empty($action['section'])) {
+            $this->app->triggerEvent(new Log(['message' => "Syncing", 'category' => 'dfs_sync', 'info' => $action]));
+            $t = microtime(true);
             $result = $this->syncSection($action['section'], $action['target']);
+            if (!empty($result)) {
+                $this->app->triggerEvent(new Log([
+                    'message' => "Synced",
+                    'category' => 'dfs_sync',
+                    'result' => $result,
+                    'startTime' => $startTime,
+                    'info' => $action,
+                    'time' => round(microtime(true) - $t, 1)
+                ]));
+                $subject = 'DSF SYNC: ' . json_encode($action);
+                $this->app->triggerEvent(new \Skvn\Event\Events\NotifyRegular(['subject' => $subject, 'message' => implode(PHP_EOL, $result)]));
+                return;
+            }
+            $this->app->triggerEvent(new \Skvn\Event\Events\Log(['message' => "Unknown result", 'category' => 'dfs_sync']));
+            return;
         }
-        if (!empty($result)) {
-            $subject = 'DSF SYNC: ' . json_encode($action);
-            $this->app->triggerEvent(new \Skvn\Event\Events\NotifyRegular(['subject' => $subject, 'message' => implode(PHP_EOL, $result)]));
-        }
+        $this->app->triggerEvent(new \Skvn\Event\Events\Log(['message' => "No section", 'category' => 'dfs_sync']));
     }
 
 
     private function syncSection($section, $target)
     {
+        $t = microtime(true);
         $this->app->db->disconnect();
         $command = $this->app->cluster->getOption('rsync_command') . ' ';
         $command .= $this->app->getPath($this->app->cluster->getOption("sections_path")) . "/" . $section . "/ ";
@@ -130,6 +148,8 @@ class Dfs extends ConsoleActionEvent
         $strings[] = "Section " . $section . " copied to node " . $target;
         $strings[] = "Result: ";
         $strings = array_merge($strings, $result);
+        $strings[] = '';
+        $strings[] = 'Process done in ' . round(microtime(true)-$t, 1) . ' seconds';
         return $strings;
     }
 
