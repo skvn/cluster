@@ -149,6 +149,11 @@ class Cluster
         return $this->config['hosts'][$host_id];
     }
 
+    function isMaster()
+    {
+        return $this->getMasterHost() === false;
+    }
+
     function getMasterHost()
     {
         if (!empty($this->config['master_host'])) {
