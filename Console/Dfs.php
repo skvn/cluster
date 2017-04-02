@@ -111,7 +111,7 @@ class Dfs extends ConsoleActionEvent
             $this->app->triggerEvent(new Log(['message' => "Foreign source", 'category' => 'dfs_sync']));
             return;
         }
-        if (!empty($action['section'])) {
+        if (!empty($action['section']) || !empty($action['data']) || !empty($action['shared']) || !empty($action['common'])) {
             $this->app->triggerEvent(new Log(['message' => "Syncing", 'category' => 'dfs_sync', 'info' => $action]));
             $t = microtime(true);
             $result = $this->processSync($action);
@@ -132,7 +132,7 @@ class Dfs extends ConsoleActionEvent
             $this->app->triggerEvent(new \Skvn\Event\Events\Log(['message' => "Unknown result", 'category' => 'dfs_sync']));
             return;
         }
-        $this->app->triggerEvent(new \Skvn\Event\Events\Log(['message' => "No section", 'category' => 'dfs_sync']));
+        $this->app->triggerEvent(new \Skvn\Event\Events\Log(['message' => "No action", 'category' => 'dfs_sync']));
     }
 
     private function processSync($args)
