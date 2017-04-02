@@ -378,6 +378,67 @@ class Cluster
         return $down;
     }
 
+    function getDeployFilename($service = null, $filename = null)
+    {
+        $path = $this->app->getPath('@var/depl');
+        if ($service) {
+            $path .= '/' . $service;
+            if ($filename) {
+                $path .= $filename;
+            }
+        }
+        return $path;
+    }
+
+    function startDeployService($service)
+    {
+        $conf = $this->config['deploy'][$service];
+        if (empty($conf)) {
+            throw new Exceptions\ClusterException('Service ' . $service . ' not found');
+        }
+        $files = [];
+        if (!empty($conf['files'])) {
+            foreach ($conf['files'] as $file) {
+                $files[$file] = base64_encode(file_get_contents($file));
+            }
+        }
+        foreach ($this->hosts as $host) {
+            $this->callHost($host, 'storeDeployData', [
+                'service' => $service,
+                'files' => $files
+            ]);
+        }
+    }
+
+    function processDeployService($service)
+    {
+        $result = [];
+        $conf = $this->config['deploy'][$service];
+        if (empty($conf || empty($conf['restartcmd']))) {
+            throw new Exceptions\ClusterException('Service ' . $service . ' not found');
+        }
+        foreach ($conf['files'] ?? [] as $file) {
+            if (!file_exists($this->getDeployFilename($service, $file))) {
+                throw new Exceptions\ClusterException('Deploy failed: ' . $file . ' not found');
+            }
+        }
+        foreach ($conf['files'] ?? [] as $file) {
+            if (file_exists($file)) {
+                unlink($file);
+            }
+            copy($this->getDeployFilename($service, $file), $file);
+            $result[] = $file . ' updated';
+        }
+        exec($conf['restartcmd'], $output);
+        $result[] = '<bold>' . $conf['restartcmd'] . '</bold> executed';
+        $result = array_merge($result, $output);
+        $this->app->triggerEvent(new \Skvn\Event\Events\NotifyProblem([
+            'problem' => 'deploy-done',
+            'service' => $service,
+            'host_id' => $this->config['my_id']
+        ]));
+        return $result;
+    }
 
     function init()
     {

@@ -94,6 +94,40 @@ class Dfs extends ConsoleActionEvent
         }
     }
 
+    /**
+     * Deploy configuration for system service
+     * @argument string *service Service to deploy
+     */
+    function actionDeploy()
+    {
+        $this->app->cluster->startDeployService($this->arguments[0]);
+    }
+
+    /**
+     * Execute deploy service if available. Should be executed as root
+     */
+    function actionProcessDeploy()
+    {
+        if (file_exists($this->app->cluster->getDeployFilename())) {
+            foreach ($this->app->cluster->getOption('deploy') as $service => $conf) {
+                if (file_exists($this->app->cluster->getDeployFilename($service))) {
+                    $result = $this->app->cluster->processDeployService($service);
+                    $this->stdout(implode(PHP_EOL, $result));
+                    break;
+                }
+            }
+            $this->app->triggerEvent(new \Skvn\Cluster\Events\CleanupDeploy());
+        }
+    }
+
+    /**
+     * Cleanup from previous deploy attempt
+     */
+    function actionResetDeploy()
+    {
+        $this->app->cluster->triggerEvent(new \Skvn\Cluster\Events\CleanupDeploy());
+    }
+
 
     /**
      * Scheduled rsync data sync
@@ -158,6 +192,7 @@ class Dfs extends ConsoleActionEvent
             foreach ($this->app->cluster->getOption('sync') as $part => $path) {
                 $strings[] = 'Common part ' . $part . ' copied to node ' . $args['target'];
                 $command = $this->createSyncCommonCommand($host, $path, $part);
+                $strings[] = $command;
                 $result = [];
                 exec($command, $result);
                 $strings[] = 'Result: ';
@@ -171,6 +206,7 @@ class Dfs extends ConsoleActionEvent
 
         if (!empty($command)) {
             exec($command, $result);
+            $strings[] = $command;
             $strings[] = 'Result: ';
             $strings = array_merge($strings, $result);
             $strings[] = '';
@@ -201,7 +237,7 @@ class Dfs extends ConsoleActionEvent
     private function createSyncSharedCommand($targetHost)
     {
         $command = $this->app->cluster->getOption('rsync_command') . '  -a -h -L --stats --partial ';
-        $command .= \App :: getPath($this->app->cluster->getOption('shared_path')) . ' ';
+        $command .= $this->app->getPath($this->app->cluster->getOption('shared_path')) . '/ ';
         $command .= $targetHost['img'] . "::shared  2>&1";
         return $command;
     }

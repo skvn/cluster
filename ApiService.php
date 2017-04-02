@@ -72,4 +72,31 @@ class ApiService extends BaseService
         return true;
     }
 
+    function storeDeployData($data)
+    {
+        if (empty($data['service'])) {
+            throw new Exceptions\ClusterException('Service to deploy not defined');
+        }
+        $conf = $this->app->cluster->getOption('deploy');
+        if (empty($conf[$data['service']])) {
+            throw new Exceptions\ClusterException('Configuration for service ' . $data['service'] . ' not found');
+        }
+        if (file_exists($this->app->cluster->getDeployFilename())) {
+            throw new Exceptions\ClusterException('Another deploy process is active');
+        }
+        mkdir($this->app->cluster->getDeployFilename(), 0777, true);
+        foreach ($data['files'] ?? [] as $file => $content) {
+            $path = $this->app->cluster->getDeployFilename($data['service'], $file);
+            if (!file_exists(dirname($path))) {
+                mkdir(dirname($path), 0777, true);
+            }
+            file_put_contents($path, base64_decode($content));
+        }
+        $this->app->triggerEvent(new \Skvn\Event\Events\NotifyProblem([
+            'problem' => 'deploy-started',
+            'host_id' => $this->app->cluster->getOption('my_id'),
+            'service' => $data['service']
+        ]));
+    }
+
 }
