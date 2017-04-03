@@ -262,8 +262,30 @@ class Cluster
 
     function updateClient($data)
     {
-        return $this->app->db->update($this->config['client_table'], $data);
+        $result = $this->app->db->update($this->config['client_table'], $data);
+        if (!empty($data['last_event'])) {
+            $row = $this->app->db->selectOne('select min(last_event) as min_event from ' . $this->config['client_table']);
+            if (!empty($row['min_event'])) {
+                $this->app->db->statement('delete from ' . $this->config['queue_table'] . ' where id < ?', [intval($row['min_event'])]);
+                $this->app->db->statement('optimize table ' . $this->config['queue_table']);
+                $this->log('FLUSH QUEUE', $row['min_event']);
+            }
+        }
+        return $result;
     }
+
+    function clear()
+    {
+        if ($this->config['is_master'])
+        {
+            $row = \DB :: selectOne("select min(last_event) as min_event from `".$this->config['client_table']."`");
+            $min_event = isset($row['min_event']) ? $row['min_event'] : 0;
+            \DB :: statement("delete from `".$this->config['queue_table']."` where id<".intval($min_event));
+            $this->log("QUEUE: flushed at " . $min_event. " event");
+            return array('status' => "done", "message" => "Queue cleaned");
+        }
+    }
+
 
     function isSectionLocked($section = null, $skey = null)
     {
