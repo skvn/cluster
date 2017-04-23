@@ -7,14 +7,28 @@ use Skvn\Base\Traits\SelfDescribe;
 use Skvn\Cluster\Cluster;
 use Skvn\Cluster\Exceptions\ClusterException;
 use Skvn\Event\Events\Log;
+use Skvn\Event\Contracts\ScheduledEvent;
+use Skvn\Event\Traits\Scheduled;
 
 /**
  * Dfs operations
  * @package Skvn\App\Console
  */
-class Dfs extends ConsoleActionEvent
+class Dfs extends ConsoleActionEvent implements ScheduledEvent
 {
     use SelfDescribe;
+    use Scheduled;
+
+
+    function schedule()
+    {
+        $schedule = [];
+        foreach ($this->app->cluster->getOption('schedule') as $entry) {
+            $entry['time'] = $this->scheduleByString($entry['time']);
+            $schedule[] = $entry;
+        }
+        return $schedule;
+    }
 
     /**
      * Update files from queue
@@ -163,10 +177,10 @@ class Dfs extends ConsoleActionEvent
                 $this->app->triggerEvent(new \Skvn\Event\Events\NotifyRegular(['subject' => $subject, 'message' => implode(PHP_EOL, $result)]));
                 return;
             }
-            $this->app->triggerEvent(new \Skvn\Event\Events\Log(['message' => "Unknown result", 'category' => 'dfs_sync']));
+            $this->app->triggerEvent(new Log(['message' => "Unknown result", 'category' => 'dfs_sync']));
             return;
         }
-        $this->app->triggerEvent(new \Skvn\Event\Events\Log(['message' => "No action", 'category' => 'dfs_sync']));
+        $this->app->triggerEvent(new Log(['message' => "No action", 'category' => 'dfs_sync']));
     }
 
     private function processSync($args)
