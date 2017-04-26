@@ -27,6 +27,33 @@ class Dfs extends ConsoleActionEvent implements ScheduledEvent
             $entry['time'] = $this->scheduleByString($entry['time']);
             $schedule[] = $entry;
         }
+        foreach ($this->app->cluster->getOption('sync_schedule') as $t => $entry) {
+            $action = null;
+            $opts = [];
+            if (!empty($entry['section'])) {
+                $action = 'sync-section';
+                $opts = ['target' => $entry['target'], 'section' => $entry['section']];
+            }
+            if (!empty($entry['data'])) {
+                $action = 'sync-data';
+                $opts = ['target' => $entry['target'], 'exclude' => $entry['exclude'], 'data' => 'all'];
+            }
+            if (!empty($entry['shared'])) {
+                $action = 'sync-shared';
+                $opts = ['target' => $entry['target'], 'shared' => 'all'];
+            }
+            if (!empty($entry['common'])) {
+                $action = 'sync-common';
+                $opts = ['target' => $entry['target'], 'common' => 'all'];
+            }
+            $schedule[] = [
+                'time' => $this->dailyAt($t),
+                'host' => $entry['source'],
+                'user' => $this->app->cluster->getOption('sync_user'),
+                'action' => $action,
+                'options' => $opts
+            ];
+        }
         return $schedule;
     }
 
@@ -76,6 +103,7 @@ class Dfs extends ConsoleActionEvent implements ScheduledEvent
     function actionHeartbeat()
     {
         $this->app->cluster->heartbeat();
+        \App :: log('pushed', 'cron/heartbeat');
     }
 
     /**
@@ -90,6 +118,7 @@ class Dfs extends ConsoleActionEvent implements ScheduledEvent
                 'host_id' => $this->app->cluster->getOption('my_id')
             ]));
         }
+        \App :: log('checked', 'cron/heartbeat');
     }
 
     /**
@@ -106,6 +135,7 @@ class Dfs extends ConsoleActionEvent implements ScheduledEvent
                 ]));
             }
         }
+        \App :: log('checked', 'cron/ping');
     }
 
     /**
@@ -132,6 +162,7 @@ class Dfs extends ConsoleActionEvent implements ScheduledEvent
             }
             $this->app->triggerEvent(new \Skvn\Cluster\Events\CleanupDeploy());
         }
+        \App :: log('done', 'cron/deploy');
     }
 
     /**
@@ -148,7 +179,6 @@ class Dfs extends ConsoleActionEvent implements ScheduledEvent
      */
     function actionSync()
     {
-        $startTime = time();
         $schedule = $this->app->cluster->getOption('sync_schedule');
         $action = $schedule[date('H:i')] ?? null;
         if (empty($action)) {
@@ -160,21 +190,7 @@ class Dfs extends ConsoleActionEvent implements ScheduledEvent
             return;
         }
         if (!empty($action['section']) || !empty($action['data']) || !empty($action['shared']) || !empty($action['common'])) {
-            $this->app->triggerEvent(new Log(['message' => "Syncing", 'category' => 'dfs_sync', 'info' => $action]));
-            $t = microtime(true);
-            $result = $this->processSync($action);
-            //$result = $this->syncSection($action['section'], $action['target'], $action);
-            if (!empty($result)) {
-                $this->app->triggerEvent(new Log([
-                    'message' => "Synced",
-                    'category' => 'dfs_sync',
-                    'result' => $result,
-                    'startTime' => $startTime,
-                    'info' => $action,
-                    'time' => round(microtime(true) - $t, 1)
-                ]));
-                $subject = 'DSF SYNC: ' . json_encode($action);
-                $this->app->triggerEvent(new \Skvn\Event\Events\NotifyRegular(['subject' => $subject, 'message' => implode(PHP_EOL, $result)]));
+            if ($this->processSync($action)) {
                 return;
             }
             $this->app->triggerEvent(new Log(['message' => "Unknown result", 'category' => 'dfs_sync']));
@@ -183,8 +199,35 @@ class Dfs extends ConsoleActionEvent implements ScheduledEvent
         $this->app->triggerEvent(new Log(['message' => "No action", 'category' => 'dfs_sync']));
     }
 
+    function actionSyncSection()
+    {
+        return $this->processSync($this->options);
+    }
+
+    function actionSyncData()
+    {
+        $opts = $this->options;
+        if (!empty($opts['exclude'])) {
+            $opts['exclude'] = explode(',', $opts['exclude']);
+        }
+        return $this->processSync($opts);
+    }
+
+    function actionSyncShared()
+    {
+        return $this->processSync($this->options);
+    }
+
+
+    function actionSyncCommon()
+    {
+        return $this->processSync($this->options);
+    }
+
     private function processSync($args)
     {
+        $startTime = time();
+        $this->app->triggerEvent(new Log(['message' => "Syncing", 'category' => 'dfs_sync', 'info' => $args]));
         if (empty($args['target'])) {
             throw new ClusterException('Target not defined');
         }
@@ -226,6 +269,16 @@ class Dfs extends ConsoleActionEvent implements ScheduledEvent
             $strings[] = '';
         }
         $strings[] = 'Process done in ' . round(microtime(true)-$t, 1) . ' seconds';
+        $this->app->triggerEvent(new Log([
+            'message' => "Synced",
+            'category' => 'dfs_sync',
+            'result' => $strings,
+            'startTime' => $startTime,
+            'info' => $args,
+            'time' => round(microtime(true) - $t, 1)
+        ]));
+        $subject = 'DSF SYNC: ' . json_encode($args);
+        $this->app->triggerEvent(new \Skvn\Event\Events\NotifyRegular(['subject' => $subject, 'message' => implode(PHP_EOL, $strings)]));
         return $strings;
     }
 
