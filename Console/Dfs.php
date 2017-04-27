@@ -234,27 +234,26 @@ class Dfs extends ConsoleActionEvent implements ScheduledEvent
         $t = microtime(true);
         $this->app->db->disconnect();
         $host = $this->app->cluster->getHostById($args['target']);
-        $strings = [];
         if (!empty($args['section'])) {
             $command = $this->createSyncSectionCommand($host, $args['section']);
-            $strings[] = 'Section ' . $args['section'] . ' copied to node ' . $args['target'];
+            $this->stdout('Section ' . $args['section'] . ' copied to node ' . $args['target']);
         } elseif (!empty($args['data'])) {
             $command = $this->createSyncDataCommand($host, $args['exclude'] ?? []);
-            $strings[] = 'Full dataset copied to node ' . $args['target'];
-            $strings[] = 'Sections ' . implode(', ', $args['exclude']) . 'excluded';
+            $this->stdout('Full dataset copied to node ' . $args['target']);
+            $this->stdout('Sections ' . implode(', ', $args['exclude']) . 'excluded');
         } elseif (!empty($args['shared'])) {
             $command = $this->createSyncSharedCommand($host);
-            $strings[] = 'Shared data copied to node ' . $args['target'];
+            $this->stdout('Shared data copied to node ' . $args['target']);
         } elseif (!empty($args['common'])) {
             foreach ($this->app->cluster->getOption('sync') as $part => $path) {
-                $strings[] = 'Common part ' . $part . ' copied to node ' . $args['target'];
+                $this->stdout('Common part ' . $part . ' copied to node ' . $args['target']);
                 $command = $this->createSyncCommonCommand($host, $path, $part);
-                $strings[] = $command;
+                $this->stdout($command);
                 $result = [];
                 exec($command, $result);
-                $strings[] = 'Result: ';
-                $strings = array_merge($strings, $result);
-                $strings[] = '';
+                $this->stdout('Result: ');
+                $this->stdout($result);
+                $this->stdout('');
             }
             $command = null;
         } else {
@@ -263,23 +262,21 @@ class Dfs extends ConsoleActionEvent implements ScheduledEvent
 
         if (!empty($command)) {
             exec($command, $result);
-            $strings[] = $command;
-            $strings[] = 'Result: ';
-            $strings = array_merge($strings, $result);
-            $strings[] = '';
+            $this->stdout($command);
+            $this->stdout('Result: ');
+            $this->stdout($result);
+            $this->stdout('');
         }
-        $strings[] = 'Process done in ' . round(microtime(true)-$t, 1) . ' seconds';
+        $this->stdout('Process done in ' . round(microtime(true)-$t, 1) . ' seconds');
         $this->app->triggerEvent(new Log([
             'message' => "Synced",
             'category' => 'dfs_sync',
-            'result' => $strings,
+            'result' => $this->strings,
             'startTime' => $startTime,
             'info' => $args,
             'time' => round(microtime(true) - $t, 1)
         ]));
-        $subject = 'DSF SYNC: ' . json_encode($args);
-        $this->app->triggerEvent(new \Skvn\Event\Events\NotifyRegular(['subject' => $subject, 'message' => implode(PHP_EOL, $strings)]));
-        return $strings;
+        $this->mailSubject = 'DSF SYNC: ' . json_encode($args);
     }
 
     private function createSyncSectionCommand($targetHost, $section)
