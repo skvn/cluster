@@ -267,7 +267,9 @@ class Cluster
             $row = $this->app->db->selectOne('select min(last_event) as min_event from ' . $this->config['client_table']);
             if (!empty($row['min_event'])) {
                 $this->app->db->statement('delete from ' . $this->config['queue_table'] . ' where id < ?', [intval($row['min_event'])]);
-                $this->app->db->statement('optimize table ' . $this->config['queue_table']);
+                if (date('N') == 7 && date('Hi') > 23000) {
+                    $this->app->db->statement('optimize table ' . $this->config['queue_table']);
+                }
                 $this->log('FLUSH QUEUE', $row['min_event']);
             }
         }
