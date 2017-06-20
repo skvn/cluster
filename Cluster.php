@@ -15,6 +15,7 @@ class Cluster
     protected $config;
     protected $hosts = [];
     protected $downNodes = null;
+    protected $imgcacheHandlers = [];
 
     const FILE_PUSH = 2;
     const FILE_DELETE = 3;
@@ -437,6 +438,73 @@ class Cluster
                 'files' => $files
             ]);
         }
+    }
+
+    function getImgcacheHandler($handler)
+    {
+        if (!isset($this->imgcacheHandlers[$handler])) {
+            $class = $this->config['imgcache']['handlers'][$handler] ?? null;
+            if (empty($class)) {
+                throw new Exceptions\ImgcacheException('Unknown imgcache handler: ' . $handler, [], -601);
+            }
+            if (!class_exists($class)) {
+                throw new Exceptions\ImgcacheException('Imgcache handler ' . $handler . ' does not exist', [], -601);
+            }
+            $this->imgcacheHandlers[$handler] = new $class($this->config['imgcache'], $handler);
+            $this->imgcacheHandlers[$handler]->setApp($this->app);
+        }
+        return $this->imgcacheHandlers[$handler];
+    }
+
+    function getImgcacheUrl($handler, $args, $forceCache = false)
+    {
+        $hObj = $this->getImgcacheHandler($handler);
+        if (!$hObj->validate($args)) {
+            throw new Exceptions\ImgcacheException('Invalid arguments for ' . $handler . ' imgcache handler: ' . json_encode($args) . PHP_EOL . $hObj->usage());
+        }
+        $target = $hObj->getUrlByArgs($args);
+        if ($forceCache) {
+            $args['target'] = $this->app->getPath($this->config['imgcache']['path'] . '/' . $handler . '/' . $target);
+            $hObj->cache($args);
+        }
+        if ($hObj->distributed) {
+            $host = $this->getHost(null, $hObj->getDistributedKey($args), ['ts' => $args['changed'] ?? 0]);
+        } else {
+            $host = $this->getHostById($this->config['my_id'])['img'];
+        }
+        return $this->app->config('app.protocol') . $host . $this->config['imgcache']['url'] . '/' . $handler . '/' . $target;
+    }
+
+    function parseImgcacheUrl($source, $forceCache = true)
+    {
+        $url = $source;
+        if (Str :: pos('http', $url) === 0) {
+            $url = parse_url($url, PHP_URL_PATH);
+        }
+        if (Str :: pos('?', $url) !== false) {
+            $url = preg_replace('#\?.*$#', '', $url);
+        }
+        if (empty($url)) {
+            throw new Exceptions\ImgcacheException($source . ' url is invalid');
+        }
+        $url = substr($url, strlen($this->config['imgcache']['url'])+1);
+        $segments = explode('/', $url, 2);
+        if (count($segments) != 2) {
+            throw new Exceptions\ImgcacheException($source . ' url is invalid');
+        }
+        $hObj = $this->getImgcacheHandler($segments[0]);
+        $args = $hObj->getArgsByUrl($segments[1]);
+        if ($forceCache) {
+            $args['target'] = $this->app->getPath($this->config['imgcache']['path'] . '/' . $segments[0] . '/' . $segments[1]);
+            $args['imgObj'] = $hObj->cache($args);
+        }
+        return $args;
+    }
+
+    function deleteImgCache($handler, $args)
+    {
+        $hObj = $this->getImgcacheHandler($handler);
+        $hObj->flush($args);
     }
 
     function processDeployService($service)
