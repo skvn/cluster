@@ -43,6 +43,11 @@ abstract class Handler
         return 0;
     }
 
+    function getLastChanged($args)
+    {
+        return 0;
+    }
+
     protected function checkSourceImage($filename)
     {
         if (!file_exists($filename) || !is_file($filename)) {

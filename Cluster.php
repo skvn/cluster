@@ -468,7 +468,7 @@ class Cluster
             $hObj->cache($args);
         }
         if ($hObj->distributed) {
-            $host = $this->getHost(null, $hObj->getDistributedKey($args), ['ts' => $args['changed'] ?? 0]);
+            $host = $this->getHost(null, $hObj->getDistributedKey($args), ['ts' => $hObj->getLastChanged($args)]);
         } else {
             $host = $this->getHostById($this->config['my_id'])['img'];
         }
