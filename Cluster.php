@@ -471,7 +471,7 @@ class Cluster
         $hObj = $this->getImgcacheHandler($handler, $args);
         $target = $hObj->getTargetPathByArgs($args);
         if ($forceCache) {
-            $hObj->buildTargetImage($handler, $args, $this->app->getPath($this->config['imgcache']['path'] . '/' . $handler . '/' . $target));
+            $this->getImgcacheTarget($handler, $args, $this->app->getPath($this->config['imgcache']['path'] . '/' . $handler . '/' . $target));
         }
         return $this->app->getPath($this->config['imgcache']['path'] . '/' . $handler . '/' . $target);
     }
@@ -481,7 +481,7 @@ class Cluster
         $hObj = $this->getImgcacheHandler($handler);
         $target = $hObj->getTargetPathByArgs($args);
         if ($forceCache) {
-            $hObj->buildTargetImage($handler, $args, $this->app->getPath($this->config['imgcache']['path'] . '/' . $handler . '/' . $target));
+            $this->getImgcacheTarget($handler, $args, $this->app->getPath($this->config['imgcache']['path'] . '/' . $handler . '/' . $target));
         }
         if ($hObj->distributed && $hObj->getDistributedKey($args) > 0) {
             $host = $this->getHost(null, $hObj->getDistributedKey($args), ['ts' => $hObj->getLastChanged($args)]);
