@@ -501,12 +501,12 @@ class Cluster
             $url = preg_replace('#\?.*$#', '', $url);
         }
         if (empty($url)) {
-            throw new Exceptions\ImgcacheException($source . ' url is invalid');
+            throw new Exceptions\ImgcacheException($source . ' url is invalid', [], -602);
         }
         $url = substr($url, strlen($this->config['imgcache']['url'])+1);
         $segments = explode('/', $url, 2);
         if (count($segments) != 2) {
-            throw new Exceptions\ImgcacheException($source . ' url is invalid');
+            throw new Exceptions\ImgcacheException($source . ' url is invalid', [], -602);
         }
         $hObj = $this->getImgcacheHandler($segments[0]);
         $args = $hObj->getArgsByTargetPath($segments[1]);
