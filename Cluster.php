@@ -6,6 +6,7 @@ use Skvn\Base\Traits\AppHolder;
 use Skvn\Base\Helpers\Str;
 use Skvn\Event\Events\Log as LogEvent;
 use Skvn\Event\Event as BaseEvent;
+use Skvn\Base\Helpers\File;
 
 
 class Cluster
@@ -440,7 +441,7 @@ class Cluster
         }
     }
 
-    function getImgcacheHandler($handler)
+    function getImgcacheHandler($handler, $args = null)
     {
         if (!isset($this->imgcacheHandlers[$handler])) {
             $class = $this->config['imgcache']['handlers'][$handler] ?? null;
@@ -450,24 +451,39 @@ class Cluster
             if (!class_exists($class)) {
                 throw new Exceptions\ImgcacheException('Imgcache handler ' . $handler . ' does not exist', [], -601);
             }
-            $this->imgcacheHandlers[$handler] = new $class($this->config['imgcache'], $handler);
-            $this->imgcacheHandlers[$handler]->setApp($this->app);
+            $this->imgcacheHandlers[$handler] = new $class();
+            $this->imgcacheHandlers[$handler]->path = $this->app->getPath($this->config['imgcache']['path'] . '/' . $handler);
+            if (!empty($this->config['imgcache']['img_worker'])) {
+                $this->imgcacheHandlers[$handler]->imgWorker = $this->config['imgcache']['img_worker'];
+            }
+        }
+        if (!is_null($args)) {
+            if (!$this->imgcacheHandlers[$handler]->validate($args)) {
+                throw new Exceptions\ImgcacheException('Invalid arguments for ' . $handler . ' imgcache handler: ' . json_encode($args) . PHP_EOL . $this->imgcacheHandlers[$handler]->usage());
+            }
         }
         return $this->imgcacheHandlers[$handler];
+    }
+
+
+    function getImgcachePath($handler, $args, $forceCache = false)
+    {
+        $hObj = $this->getImgcacheHandler($handler, $args);
+        $target = $hObj->getTargetPathByArgs($args);
+        if ($forceCache) {
+            $hObj->buildTargetImage($handler, $args, $this->app->getPath($this->config['imgcache']['path'] . '/' . $handler . '/' . $target));
+        }
+        return $this->app->getPath($this->config['imgcache']['path'] . '/' . $handler . '/' . $target);
     }
 
     function getImgcacheUrl($handler, $args, $forceCache = false)
     {
         $hObj = $this->getImgcacheHandler($handler);
-        if (!$hObj->validate($args)) {
-            throw new Exceptions\ImgcacheException('Invalid arguments for ' . $handler . ' imgcache handler: ' . json_encode($args) . PHP_EOL . $hObj->usage());
-        }
-        $target = $hObj->getUrlByArgs($args);
+        $target = $hObj->getTargetPathByArgs($args);
         if ($forceCache) {
-            $args['target'] = $this->app->getPath($this->config['imgcache']['path'] . '/' . $handler . '/' . $target);
-            $hObj->cache($args);
+            $hObj->buildTargetImage($handler, $args, $this->app->getPath($this->config['imgcache']['path'] . '/' . $handler . '/' . $target));
         }
-        if ($hObj->distributed) {
+        if ($hObj->distributed && $hObj->getDistributedKey($args) > 0) {
             $host = $this->getHost(null, $hObj->getDistributedKey($args), ['ts' => $hObj->getLastChanged($args)]);
         } else {
             $host = $this->getHostById($this->config['my_id'])['img'];
@@ -493,18 +509,38 @@ class Cluster
             throw new Exceptions\ImgcacheException($source . ' url is invalid');
         }
         $hObj = $this->getImgcacheHandler($segments[0]);
-        $args = $hObj->getArgsByUrl($segments[1]);
+        $args = $hObj->getArgsByTargetPath($segments[1]);
         if ($forceCache) {
-            $args['target'] = $this->app->getPath($this->config['imgcache']['path'] . '/' . $segments[0] . '/' . $segments[1]);
-            $args['imgObj'] = $hObj->cache($args);
+            $args['imgObj'] = $this->getImgcacheTarget($segments[0], $args, $args['target'] = $this->app->getPath($this->config['imgcache']['path'] . '/' . $segments[0] . '/' . $segments[1]));
         }
         return $args;
+    }
+
+    function getImgcacheTarget($handler, $args, $target = null)
+    {
+        if (!empty($args['noregenerate']) && !empty($target)) {
+            if (File :: safeExists($target) && filesize($target) > 0) {
+                $class = $this->config['imgcache']['img_worker'];
+                return new $class($target);
+            }
+        }
+        $hObj = $this->getImgcacheHandler($handler);
+        $img = $hObj->buildTargetImage($args);
+        if (!empty($args['size'])) {
+            list($w, $h) = explode('x', $args['size']);
+            $img->smartResize($w, $h);
+        }
+        if (!empty($target)) {
+            File :: safeMkdir(dirname($target));
+            $img->writeImage($target);
+        }
+        return $img;
     }
 
     function deleteImgCache($handler, $args)
     {
         $hObj = $this->getImgcacheHandler($handler);
-        $hObj->flush($args);
+        $hObj->removeTarget($args);
     }
 
     function processDeployService($service)

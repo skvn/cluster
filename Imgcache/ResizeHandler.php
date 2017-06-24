@@ -8,7 +8,7 @@ use Skvn\Base\Helpers\File;
 class ResizeHandler extends Handler
 {
 
-    function getUrlByArgs($args)
+    function getTargetPathByArgs($args)
     {
         $this->checkSourceImage($args['path']);
         $hash = md5($args['path']);
@@ -17,7 +17,7 @@ class ResizeHandler extends Handler
         $cached = $this->getCachePrefix($hash, 2) . '/' .
                     $size[0] . 's' . $size[1] . '-' .
                     $this->getTruncatedHash($hash, 2) . '.' . $ext;
-        $target = $this->app->getPath($this->path . '/' . $cached);
+        $target = $this->path . '/' . $cached;
         if (!file_exists(dirname($target))) {
             File :: safeMkdir(dirname($target));
         }
@@ -30,7 +30,7 @@ class ResizeHandler extends Handler
         return $cached;
     }
 
-    function getArgsByUrl($url)
+    function getArgsByTargetPath($url)
     {
         $args = ['cached' => $url];
         $segments = explode('/', $url);
@@ -44,7 +44,7 @@ class ResizeHandler extends Handler
         $args['size'] = str_replace('s', 'x', $fileParts[0]);
         $hashParts[] = $fileParts[1];
         $args['hash'] = implode('', $hashParts);
-        $target = $this->app->getPath($this->path . '/' . $url);
+        $target = $this->path . '/' . $url;
         $index = file_exists(dirname($target) . '/.index') ? parse_ini_file(dirname($target) . '/.index') : [];
         if (isset($index[$args['hash']])) {
             $args['path'] = $index[$args['hash']];
@@ -54,18 +54,15 @@ class ResizeHandler extends Handler
         return $args;
     }
 
-    function cache($args)
+    function buildTargetImage($args)
     {
         $this->checkSourceImage($args['path']);
-        $class = $this->config['img_worker'];
+        $class = $this->imgWorker;
         $img = new $class($args['path']);
-        list($w, $h) = explode('x', $args['size']);
-        $img->smartResize($w, $h);
-        $img->writeImage($args['target']);
         return $img;
     }
 
-    function flush()
+    function removeTarget($args)
     {
 
     }

@@ -3,30 +3,21 @@
 namespace Skvn\Cluster\Imgcache;
 
 
-use Skvn\Base\Traits\AppHolder;
 use Skvn\Cluster\Exceptions\ImgcacheException;
 
 abstract class Handler
 {
-    use AppHolder;
 
-    protected $config;
-    protected $name;
-    protected $path;
+    public $path;
+    public $imgWorker = ImagickWrap :: class;
 
     public $distributed = false;
 
-    function __construct($config, $name)
-    {
-        $this->config = $config;
-        $this->name = $name;
-        $this->path = $this->config['path'] . '/' . $name;
-    }
 
-    abstract function getUrlByArgs($args);
-    abstract function getArgsByUrl($url);
-    abstract function cache($args);
-    abstract function flush($args);
+    abstract function getTargetPathByArgs($args);
+    abstract function getArgsByTargetPath($url);
+    abstract function buildTargetImage($args);
+    abstract function removeTarget($args);
 
     function validate($args)
     {
