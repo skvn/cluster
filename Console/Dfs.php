@@ -47,6 +47,9 @@ class Dfs extends ConsoleActionEvent implements ScheduledEvent
                 $action = 'sync-common';
                 $opts = ['target' => $entry['target'], 'common' => 'all'];
             }
+            if (!empty($entry['quiet'])) {
+                $opts['quiet'] = $entry['quiet'];
+            }
             $schedule[] = [
                 'time' => $this->dailyAt($t),
                 'host' => $entry['source'],
