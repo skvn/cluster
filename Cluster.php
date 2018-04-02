@@ -46,6 +46,15 @@ class Cluster
     {
         return $this->config['hosts'];
     }
+    
+    function getClusterHosts($withSelf = false)
+    {
+        $hosts = $this->hosts;
+        if ($withSelf) {
+            $hosts[$this->config['my_id']] = $this->getHostByid($this->config['my_id']);
+        }
+        return $hosts;
+    }
 
     function pushFile($file)
     {
