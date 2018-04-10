@@ -334,6 +334,9 @@ class Cluster
         }
         if ($this->isHostDown($host_id)) {
             $host = $this->getMasterHost();
+            if ($host === false) {
+                $host = $this->getHostById($this->config['my_id']);
+            }
         } else {
             $host = $this->getHostById($host_id);
         }
