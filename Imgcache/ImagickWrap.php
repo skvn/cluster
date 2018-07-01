@@ -92,6 +92,24 @@ class ImagickWrap extends \Imagick
                 break;
         }
     }
+    
+    function getImageMagickVersion()
+    {
+        $v = static::getVersion();
+        preg_match('/ImageMagick ([0-9]+\.[0-9]+\.[0-9]+)/', $v['versionString'], $v);
+        return $v[1];
+    }
+    
+    function setImageOpacity($opacity)
+    {
+        if (version_compare($this->getImageMagickVersion(), '7.0.0') < 0) {
+            return parent::setImageOpacity($opacity);
+        } else {
+            return parent::setImageAlpha($opacity);
+        }
+    }
+    
+    
 
 
 }
