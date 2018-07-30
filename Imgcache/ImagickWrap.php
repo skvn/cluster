@@ -42,8 +42,8 @@ class ImagickWrap extends \Imagick
             case static::COLORSPACE_OHTA:
                 return "OHTA";
                 break;
-            case static::COLORSPACE_LAB:
-                return "LAB";
+            case 5: //LAB or HCLP
+                return "HCLP";
                 break;
             case static::COLORSPACE_XYZ:
                 return "XYZ";
@@ -78,10 +78,10 @@ class ImagickWrap extends \Imagick
             case static::COLORSPACE_HWB:
                 return "HWB";
                 break;
-            case static::COLORSPACE_REC601LUMA:
+            case 17: //static::COLORSPACE_REC601LUMA or LUV:
                 return "REC601LUMA";
                 break;
-            case static::COLORSPACE_REC709LUMA:
+            case 19: //static::COLORSPACE_REC709LUMA: or COLORSPACE_REC601YCBCR
                 return "REC709LUMA";
                 break;
             case static::COLORSPACE_LOG:
