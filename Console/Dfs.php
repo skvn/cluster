@@ -7,6 +7,7 @@ use Skvn\Base\Traits\SelfDescribe;
 use Skvn\Cluster\Cluster;
 use Skvn\Cluster\Exceptions\ClusterException;
 use Skvn\Event\Events\Log;
+use Skvn\Cluster\Events\ValidateSection;
 use Skvn\Event\Contracts\ScheduledEvent;
 use Skvn\Event\Traits\Scheduled;
 use Skvn\Base\Helpers\File;
@@ -239,6 +240,7 @@ class Dfs extends ConsoleActionEvent implements ScheduledEvent
         $this->app->db->disconnect();
         $host = $this->app->cluster->getHostById($args['target']);
         if (!empty($args['section'])) {
+            $this->app->triggerEvent(new ValidateSection($args));
             $command = $this->createSyncSectionCommand($host, $args['section']);
             $this->stdout('Section ' . $args['section'] . ' copied to node ' . $args['target']);
         } elseif (!empty($args['data'])) {
