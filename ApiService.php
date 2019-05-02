@@ -44,6 +44,7 @@ class ApiService extends BaseService
             unlink($file);
             $this->app->cluster->log('DELETED', $data['file']);
         }
+        return [];
     }
 
     function queue($data)
@@ -57,7 +58,7 @@ class ApiService extends BaseService
         $data['id'] = $data['host_id'];
         unset($data['host_id']);
         unset($data['endpoint']);
-        return $this->app->cluster->updateClient($data);
+        return ['result' => $this->app->cluster->updateClient($data)];
     }
 
     function triggerEvent($data)
