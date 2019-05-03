@@ -321,42 +321,6 @@ class Dfs extends ConsoleActionEvent implements ScheduledEvent
     }
 
 
-    /**
-     * Collect os configuration according to map passed
-     * @argument string config Path to os configuration map
-     */
-    function actionCollectSysConf()
-    {
-        $this->app->config->load($this->app->getPath($this->arguments[0]));
-        $server_id = $this->app->cluster->getOption('my_id');
-
-        $files = array_merge($this->app->config['sysconf_all'], $this->app->config['sysconf_' . $server_id]);
-
-        if (empty($files)) {
-            throw new ClusterException('Configuration not found');
-        }
-
-        foreach ($files as $source => $file) {
-            $target = $this->app->getPath($this->app->config['sysconf_target.target']) . '/' . $server_id . '/' . $file;
-            if (!file_exists($source)) {
-                $this->error($source . ' do not exists in fs');
-                continue;
-            }
-            if (!file_exists($target)) {
-                File :: mkdir(dirname($target));
-                copy($source, $target);
-                $this->stdout('New ' . $target . ' created');
-            } else {
-                if (md5_file($source) != md5_file($target)) {
-                    unlink($target);
-                    copy($source, $target);
-                    $this->stdout($target . ' updated');
-                }
-            }
-        }
-
-    }
-
 
 
 
