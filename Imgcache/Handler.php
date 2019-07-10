@@ -49,22 +49,4 @@ abstract class Handler
             throw new ImgcacheException($filename . ' not a image');
         }
     }
-
-    protected function getCachePrefix($hash, $level = 2, $replaceAd = false)
-    {
-        $parts = [];
-        for ($i=0; $i<$level; $i++) {
-            $part = substr($hash, $i*2, 2);
-            if ($replaceAd) {
-                $part = str_replace('ad', 'bd', $part);
-            }
-            $parts[] = $part;
-        }
-        return implode('/', $parts);
-    }
-
-    protected function getTruncatedHash($hash, $level)
-    {
-        return substr($hash, $level*2);
-    }
 }
