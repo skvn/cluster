@@ -4,6 +4,7 @@ namespace Skvn\Cluster\Imgcache;
 
 use Skvn\Cluster\Exceptions\ImgcacheException;
 use Skvn\Base\Helpers\File;
+use Skvn\Base\Helpers\Str;
 
 class ResizeHandler extends Handler
 {
@@ -14,9 +15,9 @@ class ResizeHandler extends Handler
         $hash = md5($args['path']);
         $ext = File :: getExtension($args['path']);
         $size = explode('x', $args['size']);
-        $cached = $this->getCachePrefix($hash, 2) . '/' .
+        $cached = Str::cachePrefix($hash) . '/' .
                     $size[0] . 's' . $size[1] . '-' .
-                    $this->getTruncatedHash($hash, 2) . '.' . $ext;
+                    substr($hash, 4) . '.' . $ext;
         $target = $this->path . '/' . $cached;
         if (!file_exists(dirname($target))) {
             File :: safeMkdir(dirname($target));
