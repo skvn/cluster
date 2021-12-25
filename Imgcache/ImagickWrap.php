@@ -100,7 +100,7 @@ class ImagickWrap extends \Imagick
         return $v[1];
     }
     
-    function setImageOpacity($opacity)
+    function setImageOpacity(float $opacity):bool
     {
         if (version_compare($this->getImageMagickVersion(), '7.0.0') < 0) {
             return parent::setImageOpacity($opacity);
