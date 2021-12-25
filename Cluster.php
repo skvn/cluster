@@ -162,7 +162,6 @@ class Cluster
 
     function isMaster()
     {
-        return true;
         return $this->getMasterHost() === false;
     }
 
