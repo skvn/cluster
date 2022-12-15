@@ -14,7 +14,7 @@ class ImagickWrap extends \Imagick
 
     function smartResize($w, $h, $args = [])
     {
-        $this->scaleImage($w, $h, true);
+        $this->scaleImage(round($w), round($h), true);
     }
 
     function getImageColorspaceName()
