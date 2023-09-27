@@ -244,9 +244,13 @@ class Dfs extends ConsoleActionEvent implements ScheduledEvent
             $command = $this->createSyncSectionCommand($host, $args['section']);
             $this->stdout('Section ' . $args['section'] . ' copied to node ' . $args['target']);
         } elseif (!empty($args['data'])) {
-            $command = $this->createSyncDataCommand($host, $args['exclude'] ?? []);
+            $exclude = $args['exclude'] ?? [];
+            if (empty($exclude)) {
+                $exclude = [];
+            }
+            $command = $this->createSyncDataCommand($host, $exclude);
             $this->stdout('Full dataset copied to node ' . $args['target']);
-            $this->stdout('Sections ' . implode(', ', $args['exclude']) . 'excluded');
+            $this->stdout('Sections ' . implode(', ', $exclude) . 'excluded');
         } elseif (!empty($args['shared'])) {
             $command = $this->createSyncSharedCommand($host);
             $this->stdout('Shared data copied to node ' . $args['target']);
@@ -296,8 +300,10 @@ class Dfs extends ConsoleActionEvent implements ScheduledEvent
     private function createSyncDataCommand($targetHost, $exclude)
     {
         $command = $this->app->cluster->getOption('rsync_command') . '  -a -h -L -k -K --delete --stats --partial ';
-        foreach ($exclude ?? [] as $ex) {
-            $command .= ' --exclude=/' . $ex . ' ';
+        if (!empty($exclude)) {
+            foreach ($exclude ?? [] as $ex) {
+                $command .= ' --exclude=/' . $ex . ' ';
+            }
         }
         $command .= $this->app->getPath($this->app->cluster->getOption("sections_path")) . "/ ";
         $command .= $targetHost['img'] . "::data 2>&1";
