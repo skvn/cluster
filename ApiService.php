@@ -3,6 +3,7 @@
 namespace Skvn\Cluster;
 
 use Skvn\App\ApiService as BaseService;
+use Skvn\Base\Exceptions\CurlException;
 
 class ApiService extends BaseService
 {
@@ -98,6 +99,15 @@ class ApiService extends BaseService
             'host_id' => $this->app->cluster->getOption('my_id'),
             'service' => $data['service']
         ]));
+    }
+
+    function urlLoad($data)
+    {
+        try {
+            return ['loaded' => true, 'content' => $this->app->get('urlLoader')->load($data['url'], $data['args'], $data['params'])];
+        } catch (CurlException $e) {
+            return ['loaded' => false, 'error' => $e->getMessage()];
+        }
     }
 
 }
