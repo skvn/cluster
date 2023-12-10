@@ -241,23 +241,23 @@ class Dfs extends ConsoleActionEvent implements ScheduledEvent
         $host = $this->app->cluster->getHostById($args['target']);
         if (!empty($args['section'])) {
             $this->app->triggerEvent(new ValidateSection($args));
-            $command = $this->createSyncSectionCommand($host, $args['section']);
+            $command = $this->createSyncSectionCommand($host, $args['section'], $args);
             $this->stdout('Section ' . $args['section'] . ' copied to node ' . $args['target']);
         } elseif (!empty($args['data'])) {
             $exclude = $args['exclude'] ?? [];
             if (empty($exclude)) {
                 $exclude = [];
             }
-            $command = $this->createSyncDataCommand($host, $exclude);
+            $command = $this->createSyncDataCommand($host, $exclude, $args);
             $this->stdout('Full dataset copied to node ' . $args['target']);
             $this->stdout('Sections ' . implode(', ', $exclude) . 'excluded');
         } elseif (!empty($args['shared'])) {
-            $command = $this->createSyncSharedCommand($host);
+            $command = $this->createSyncSharedCommand($host, $args);
             $this->stdout('Shared data copied to node ' . $args['target']);
         } elseif (!empty($args['common'])) {
             foreach ($this->app->cluster->getOption('sync') as $part => $path) {
                 $this->stdout('Common part ' . $part . ' copied to node ' . $args['target']);
-                $command = $this->createSyncCommonCommand($host, $path, $part);
+                $command = $this->createSyncCommonCommand($host, $path, $part, $args);
                 $this->stdout($command);
                 $result = [];
                 exec($command, $result);
@@ -289,7 +289,7 @@ class Dfs extends ConsoleActionEvent implements ScheduledEvent
         $this->mailSubject = 'DSF SYNC: ' . json_encode($args);
     }
 
-    private function createSyncSectionCommand($targetHost, $section)
+    private function createSyncSectionCommand($targetHost, $section, $args = [])
     {
         $command = $this->app->cluster->getOption('rsync_command') . '  -a -h -L -k -K --delete --stats --partial ';
         $command .= $this->app->getPath($this->app->cluster->getOption("sections_path")) . "/" . $section . "/ ";
@@ -297,7 +297,7 @@ class Dfs extends ConsoleActionEvent implements ScheduledEvent
         return $command;
     }
 
-    private function createSyncDataCommand($targetHost, $exclude)
+    private function createSyncDataCommand($targetHost, $exclude, $args = [])
     {
         $command = $this->app->cluster->getOption('rsync_command') . '  -a -h -L -k -K --delete --stats --partial ';
         if (!empty($exclude)) {
@@ -310,7 +310,7 @@ class Dfs extends ConsoleActionEvent implements ScheduledEvent
         return $command;
     }
 
-    private function createSyncSharedCommand($targetHost)
+    private function createSyncSharedCommand($targetHost, $args = [])
     {
         $command = $this->app->cluster->getOption('rsync_command') . '  -a -h -L --stats --partial ';
         $command .= $this->app->getPath($this->app->cluster->getOption('shared_path')) . '/ ';
@@ -318,9 +318,10 @@ class Dfs extends ConsoleActionEvent implements ScheduledEvent
         return $command;
     }
 
-    private function createSyncCommonCommand($targetHost, $path, $name)
+    private function createSyncCommonCommand($targetHost, $path, $name, $args = [])
     {
-        $command = $this->app->cluster->getOption('rsync_command') . '  -a -h -L -k -K --delete --stats --partial ';
+        
+        $command = $this->app->cluster->getOption('rsync_command') . '  -a -h ' . $this->app->cluster->getOption('sync_common_links_args') . ' --delete --stats --partial ';
         $command .= $path . "/ ";
         $command .= $targetHost['img'] . "::common_" . $name . ' 2>&1';
         return $command;
