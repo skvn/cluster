@@ -323,7 +323,11 @@ class Dfs extends ConsoleActionEvent implements ScheduledEvent
         
         $command = $this->app->cluster->getOption('rsync_command') . '  -a -h ' . $this->app->cluster->getOption('sync_common_links_args') . ' --delete --stats --partial ';
         $command .= $path . "/ ";
-        $command .= $targetHost['img'] . "::common_" . $name . ' 2>&1';
+        if (!empty($args['direct_path'])) {
+            $command .= $targetHost['img'] . ":" . $path . ' 2>&1';
+        } else {
+            $command .= $targetHost['img'] . "::common_" . $name . ' 2>&1';
+        }
         return $command;
     }
 
