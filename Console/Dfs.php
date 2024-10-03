@@ -47,6 +47,9 @@ class Dfs extends ConsoleActionEvent implements ScheduledEvent
             if (!empty($entry['common'])) {
                 $action = 'sync-common';
                 $opts = ['target' => $entry['target'], 'common' => 'all'];
+                if (!empty($entry['direct_path'])) {
+                    $opts['direct_path'] = true;
+                }
             }
             if (!empty($entry['quiet'])) {
                 $opts['quiet'] = $entry['quiet'];
