@@ -297,6 +297,7 @@ class Dfs extends ConsoleActionEvent implements ScheduledEvent
         $command = $this->app->cluster->getOption('rsync_command') . '  -a -h -L -k -K --delete --stats --partial ';
         $command .= $this->app->getPath($this->app->cluster->getOption("sections_path")) . "/" . $section . "/ ";
         $command .= $targetHost['img'] . "::section" . $section . ' 2>&1';
+        file_put_contents($this->app->getPath($this->app->cluster->getOption('sections_path')) . '/' . $section . '/.ts', time());
         return $command;
     }
 
@@ -310,6 +311,7 @@ class Dfs extends ConsoleActionEvent implements ScheduledEvent
         }
         $command .= $this->app->getPath($this->app->cluster->getOption("sections_path")) . "/ ";
         $command .= $targetHost['img'] . "::data 2>&1";
+        file_put_contents($this->app->getPath($this->app->cluster->getOption('sections_path')) . '/.ts', time());
         return $command;
     }
 
@@ -318,6 +320,7 @@ class Dfs extends ConsoleActionEvent implements ScheduledEvent
         $command = $this->app->cluster->getOption('rsync_command') . '  -a -h -L --stats --partial ';
         $command .= $this->app->getPath($this->app->cluster->getOption('shared_path')) . '/ ';
         $command .= $targetHost['img'] . "::shared  2>&1";
+        file_put_contents($this->app->getPath($this->app->cluster->getOption('shared_path')) . '/.ts', time());
         return $command;
     }
 
@@ -331,6 +334,7 @@ class Dfs extends ConsoleActionEvent implements ScheduledEvent
         } else {
             $command .= $targetHost['img'] . "::common_" . $name . ' 2>&1';
         }
+        file_put_contents($path . '/ ', time());
         return $command;
     }
 
