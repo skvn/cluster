@@ -176,7 +176,7 @@ class Cluster
 
     function isMaster()
     {
-        return $this->getMasterHost() === false;
+        return $this->getMasterHost() === false || !empty($this->config['force_master']);
     }
 
     function getMasterHost()
