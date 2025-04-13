@@ -15,6 +15,7 @@ class Cluster
 
     protected $config;
     protected $hosts = [];
+    protected $frontHosts = [];
     protected $downNodes = null;
     protected $imgcacheHandlers = [];
 
@@ -25,9 +26,13 @@ class Cluster
     {
         $this->config = $config;
         $siblings  = !empty($this->config['siblings']) ? explode(',', $this->config['siblings']) : [];
+        $front  = !empty($this->config['front_role_nodes']) ? explode(',', $this->config['front_role_nodes']) : [];
         foreach ($siblings as $host_id) {
-            if (isset($this->config['hosts'][$host_id])) {
+            if (array_key_exists($host_id, $this->config['hosts'])) {
                 $this->hosts[$host_id] = $this->config['hosts'][$host_id];
+                if (in_array($host_id, $front) && $host_id != $this->config['my_id']) {
+                    $this->frontHosts[$host_id] = $this->config['hosts'][$host_id];
+                }
             }
         }
     }
@@ -132,9 +137,18 @@ class Cluster
     function pushFileSync($file)
     {
         $file = $this->normalizeFilename($file);
-        $this->queueFile($file, static :: FILE_PUSH);
+        $this->queueFile($file, static::FILE_PUSH);
         foreach ($this->hosts as $host_id => $host) {
             $this->log('CALL PUSH', $file, ['host' => $host['ctl']]);
+            $this->callHost($host, 'fetch', ['file' => $file]);
+        }
+    }
+
+    function pushFileDirect($file, $args = [])
+    {
+        $file = $this->normalizeFilename($file);
+        foreach (!empty($args['front_hosts']) ? $this->frontHosts : $this->hosts as $host_id => $host) {
+            $this->log('CALL DIRECT PUSH', $file, ['host' => $host['ctl']]);
             $this->callHost($host, 'fetch', ['file' => $file]);
         }
     }
@@ -177,7 +191,7 @@ class Cluster
     {
         $file = $this->normalizeFilename($file);
         foreach ($this->config['http_map'] as $path => $url) {
-            if (Str :: pos($path, $file) === 0) {
+            if (Str::pos($path, $file) === 0) {
                 $target = preg_replace('#^' . $path . '#', $url, $file);
                 if (!is_null($host)) {
                     $target = $this->app->config('app.protocol') . $host . $target;
