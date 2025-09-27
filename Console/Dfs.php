@@ -56,7 +56,7 @@ class Dfs extends ConsoleActionEvent implements ScheduledEvent
             }
             $schedule[] = [
                 'time' => $this->dailyAt($t),
-                'host' => $entry['source'],
+                'host' => $this->app->getClusterHost($entry['source']),
                 'user' => $this->app->cluster->getOption('sync_user'),
                 'action' => $action,
                 'options' => $opts
