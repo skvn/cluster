@@ -74,7 +74,7 @@ class Dfs extends ConsoleActionEvent implements ScheduledEvent
         $master = $this->app->cluster->getMasterHost();
         $last_id = 0;
         foreach ($queue ?? [] as $file) {
-            if ($file['action'] == Cluster :: FILE_DELETE) {
+            if ($file['action'] == Cluster::FILE_DELETE) {
                 $filename = $this->app->getPath('@root/' . $file['filename']);
                 if (file_exists($filename)) {
                     unlink($filename);
@@ -111,7 +111,7 @@ class Dfs extends ConsoleActionEvent implements ScheduledEvent
     function actionHeartbeat()
     {
         $this->app->cluster->heartbeat();
-        \App :: log('pushed', 'cron/heartbeat');
+        $this->app->log('pushed', 'cron/heartbeat');
     }
 
     /**
@@ -126,7 +126,7 @@ class Dfs extends ConsoleActionEvent implements ScheduledEvent
                 'host_id' => $this->app->cluster->getOption('my_id')
             ]));
         }
-        \App :: log('checked', 'cron/heartbeat');
+        $this->app->log('checked', 'cron/heartbeat');
     }
 
     /**
@@ -143,7 +143,7 @@ class Dfs extends ConsoleActionEvent implements ScheduledEvent
                 ]));
             }
         }
-        \App :: log('checked', 'cron/ping');
+        $this->app->log('checked', 'cron/ping');
     }
 
     /**
@@ -170,7 +170,7 @@ class Dfs extends ConsoleActionEvent implements ScheduledEvent
             }
             $this->app->triggerEvent(new \Skvn\Cluster\Events\CleanupDeploy());
         }
-        \App :: log('done', 'cron/deploy');
+        $this->app->log('done', 'cron/deploy');
     }
 
     /**
@@ -289,7 +289,7 @@ class Dfs extends ConsoleActionEvent implements ScheduledEvent
             'info' => $args,
             'time' => round(microtime(true) - $t, 1)
         ]));
-        $this->mailSubject = 'DSF SYNC: ' . json_encode($args);
+        $this->mailSubject = 'DFS-SYNC-' . $this->app->cluster->getOption('my_id') . ': ' . json_encode($args);
     }
 
     private function createSyncSectionCommand($targetHost, $section, $args = [])
@@ -337,10 +337,4 @@ class Dfs extends ConsoleActionEvent implements ScheduledEvent
         file_put_contents($path . '/ ', time());
         return $command;
     }
-
-
-
-
-
-
 }
